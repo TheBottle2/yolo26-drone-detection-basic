@@ -1,11 +1,12 @@
 
-This directory is intended for project specific (private) libraries.
-PlatformIO will compile them to static libraries and link into the executable file.
+Bu dizin, projeye özel (private) kütüphaneler için ayrılmıştır.
+PlatformIO bu kütüphaneleri derleyip statik kütüphane olarak yürütülebilir
+dosyaya bağlar.
 
-The source code of each library should be placed in a separate directory
-("lib/your_library_name/[Code]").
+Her kütüphanenin kaynak kodu ayrı bir klasörde tutulmalıdır:
+`lib/kutuphane_adi/[Kod]`
 
-For example, see the structure of the following example libraries `Foo` and `Bar`:
+Örnek yapı (`Foo` ve `Bar`):
 
 |--lib
 |  |
@@ -15,32 +16,31 @@ For example, see the structure of the following example libraries `Foo` and `Bar
 |  |  |--src
 |  |     |- Bar.c
 |  |     |- Bar.h
-|  |  |- library.json (optional. for custom build options, etc) https://docs.platformio.org/page/librarymanager/config.html
+|  |  |- library.json (opsiyonel: özel derleme ayarları vb.)
 |  |
 |  |--Foo
 |  |  |- Foo.c
 |  |  |- Foo.h
 |  |
-|  |- README --> THIS FILE
+|  |- README  <-- BU DOSYA
 |
 |- platformio.ini
 |--src
-   |- main.c
+   |- main.cpp
 
-Example contents of `src/main.c` using Foo and Bar:
+`src/main.cpp` içinde kullanım örneği:
 ```
 #include <Foo.h>
 #include <Bar.h>
 
-int main (void)
+int main(void)
 {
-  ...
+  // ...
 }
-
 ```
 
-The PlatformIO Library Dependency Finder will find automatically dependent
-libraries by scanning project source files.
+PlatformIO, kaynak dosyaları tarayarak bağımlı kütüphaneleri otomatik olarak
+tespit eder (Library Dependency Finder).
 
-More information about PlatformIO Library Dependency Finder
+Daha fazla bilgi:
 - https://docs.platformio.org/page/librarymanager/ldf.html
