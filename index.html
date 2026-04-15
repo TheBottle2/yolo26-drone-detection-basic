@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TURRET — Drone Takip Sistemi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg:       #050a0e;
+    --panel:    #0a1520;
+    --border:   #0f2a3a;
+    --accent:   #00ffe0;
+    --warn:     #ff6b00;
+    --danger:   #ff2244;
+    --ok:       #00ff88;
+    --text:     #a0c8d8;
+    --dim:      #304050;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Izgara arka plan */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,224,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,224,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,21,32,0.9);
+    backdrop-filter: blur(8px);
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.3rem;
+    color: var(--accent);
+    letter-spacing: 4px;
+  }
+  .logo span { color: var(--dim); font-size: 0.75rem; margin-left: 12px; }
+
+  #ws-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    letter-spacing: 2px;
+  }
+  #ws-status.connected    { color: var(--ok);     border-color: var(--ok); }
+  #ws-status.disconnected { color: var(--danger); border-color: var(--danger); }
+
+  /* ── Ana Layout ── */
+  .layout {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: auto auto;
+    gap: 16px;
+    padding: 16px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── Kamera ── */
+  .camera-wrap {
+    position: relative;
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+
+  #camera-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .camera-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Köşe dekorasyonları */
+  .corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.6;
+  }
+  .corner.tl { top:8px; left:8px;  border-width:2px 0 0 2px; }
+  .corner.tr { top:8px; right:8px; border-width:2px 2px 0 0; }
+  .corner.bl { bottom:8px; left:8px;  border-width:0 0 2px 2px; }
+  .corner.br { bottom:8px; right:8px; border-width:0 2px 2px 0; }
+
+  /* Merkez crosshair */
+  .crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px; height: 24px;
+    opacity: 0.4;
+  }
+  .crosshair::before, .crosshair::after {
+    content: '';
+    position: absolute;
+    background: var(--accent);
+  }
+  .crosshair::before { width:1px; height:100%; left:50%; top:0; }
+  .crosshair::after  { width:100%; height:1px; top:50%; left:0; }
+
+  .no-signal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--dim);
+    font-size: 0.9rem;
+    letter-spacing: 3px;
+  }
+
+  /* ── Sağ Panel ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .card-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    color: var(--dim);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Mod butonu */
+  #mode-btn {
+    width: 100%;
+    padding: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    letter-spacing: 3px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #mode-btn.manual {
+    background: var(--warn);
+    color: #000;
+  }
+  #mode-btn.track {
+    background: var(--ok);
+    color: #000;
+  }
+  #mode-btn:hover { filter: brightness(1.15); }
+
+  #mode-label {
+    text-align: center;
+    margin-top: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--dim);
+  }
+
+  /* Manuel kontroller */
+  .dir-pad {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .dir-btn {
+    padding: 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    user-select: none;
+  }
+  .dir-btn:hover  { border-color: var(--accent); color: var(--accent); background: rgba(0,255,224,0.05); }
+  .dir-btn:active { background: rgba(0,255,224,0.15); }
+  .dir-btn.disabled { opacity: 0.25; pointer-events: none; }
+
+  /* Metrik satırlar */
+  .metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .metric:last-child { border-bottom: none; }
+  .metric-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    color: var(--dim);
+  }
+  .metric-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--accent);
+  }
+  .metric-value.warn   { color: var(--warn); }
+  .metric-value.danger { color: var(--danger); }
+  .metric-value.ok     { color: var(--ok); }
+
+  /* Hedef kutusu */
+  #target-box {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.8;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  #target-box.active { color: var(--ok); }
+
+  /* ── Alt bar ── */
+  .bottom-bar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--dim);
+  }
+  .bottom-bar span { color: var(--accent); }
+
+  /* Scan animasyonu (track modda) */
+  @keyframes scan {
+    0%   { top: 0; opacity: 0.6; }
+    100% { top: 100%; opacity: 0; }
+  }
+  .scan-line {
+    display: none;
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scan 2s linear infinite;
+  }
+  body.tracking .scan-line { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TURRET <span>// DRONE TAKİP SİSTEMİ v1.0</span></div>
+  <div id="ws-status" class="disconnected">● BAĞLANTI YOK</div>
+</header>
+
+<div class="layout">
+
+  <!-- Kamera -->
+  <div class="camera-wrap">
+    <img id="camera-feed" alt="">
+    <div class="camera-overlay">
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="crosshair"></div>
+      <div class="scan-line"></div>
+    </div>
+    <div class="no-signal" id="no-signal">SINYAL BEKLENİYOR...</div>
+  </div>
+
+  <!-- Sağ panel -->
+  <div class="side-panel">
+
+    <!-- Mod -->
+    <div class="card">
+      <div class="card-title">// MOD</div>
+      <button id="mode-btn" class="manual" onclick="toggleMode()">MANUEL</button>
+      <div id="mode-label">Motor kontrol: KAPALI</div>
+    </div>
+
+    <!-- Manuel kontrol -->
+    <div class="card" id="manual-card">
+      <div class="card-title">// MANUEL KONTROL</div>
+      <div class="dir-pad">
+        <button class="dir-btn" id="btn-left"
+          onmousedown="sendCmd('L')" onmouseup="sendCmd('S')"
+          ontouchstart="sendCmd('L')" ontouchend="sendCmd('S')">◀ SOL</button>
+        <button class="dir-btn" id="btn-right"
+          onmousedown="sendCmd('R')" onmouseup="sendCmd('S')"
+          ontouchstart="sendCmd('R')" ontouchend="sendCmd('S')">SAĞ ▶</button>
+      </div>
+      <p style="font-size:0.65rem;color:var(--dim);margin-top:8px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">
+        Basılı tut → hareket, bırak → dur
+      </p>
+    </div>
+
+    <!-- Mesafe -->
+    <div class="card">
+      <div class="card-title">// SENSÖR</div>
+      <div class="metric">
+        <span class="metric-label">HC-SR04</span>
+        <span class="metric-value" id="dist-val">— cm</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">MOTOR</span>
+        <span class="metric-value" id="cmd-val">STOP</span>
+      </div>
+    </div>
+
+    <!-- Hedef -->
+    <div class="card">
+      <div class="card-title">// HEDEF</div>
+      <div id="target-box">HEDEF ALGILANMADI</div>
+    </div>
+
+  </div>
+
+  <!-- Alt bar -->
+  <div class="bottom-bar">
+    <span>ws://localhost:8765</span>
+    <span id="fps-val">— FPS</span>
+    <span id="time-val">--:--:--</span>
+  </div>
+
+</div>
+
+<script>
+  let ws = null;
+  let mode = 'manual';
+  let lastFrameTime = Date.now();
+  let frameCount = 0;
+  let fps = 0;
+
+  // ── WebSocket ──
+  function connect() {
+    ws = new WebSocket('ws://localhost:8765');
+
+    ws.onopen = () => {
+      document.getElementById('ws-status').className = 'connected';
+      document.getElementById('ws-status').textContent = '● BAĞLI';
+    };
+
+    ws.onclose = () => {
+      document.getElementById('ws-status').className = 'disconnected';
+      document.getElementById('ws-status').textContent = '● BAĞLANTI YOK';
+      setTimeout(connect, 2000); // otomatik yeniden bağlan
+    };
+
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      updateUI(data);
+    };
+  }
+
+  // ── UI Güncelle ──
+  function updateUI(data) {
+    // Kamera
+    const feed = document.getElementById('camera-feed');
+    const noSig = document.getElementById('no-signal');
+    if (data.frame) {
+      feed.src = 'data:image/jpeg;base64,' + data.frame;
+      noSig.style.display = 'none';
+    }
+
+    // FPS hesapla
+    frameCount++;
+    const now = Date.now();
+    if (now - lastFrameTime >= 1000) {
+      fps = frameCount;
+      frameCount = 0;
+      lastFrameTime = now;
+      document.getElementById('fps-val').textContent = fps + ' FPS';
+    }
+
+    // Mesafe
+    const distEl = document.getElementById('dist-val');
+    const dist = data.distance;
+    if (dist < 0) {
+      distEl.textContent = '— cm';
+      distEl.className = 'metric-value';
+    } else {
+      distEl.textContent = dist + ' cm';
+      distEl.className = dist < 30 ? 'metric-value danger' :
+                         dist < 80 ? 'metric-value warn' : 'metric-value ok';
+    }
+
+    // Motor komutu
+    const cmdEl = document.getElementById('cmd-val');
+    const cmd = data.command;
+    cmdEl.textContent = cmd === 'R' ? 'SAĞ →' : cmd === 'L' ? '← SOL' : 'STOP';
+    cmdEl.className = 'metric-value ' + (cmd === 'S' ? '' : 'ok');
+
+    // Hedef
+    const targetBox = document.getElementById('target-box');
+    if (data.target) {
+      const t = data.target;
+      targetBox.className = 'active';
+      targetBox.innerHTML =
+        `SINIF  : ${t.cls}<br>` +
+        `GÜVEN  : ${(t.conf * 100).toFixed(1)}%<br>` +
+        `KONUM  : x=${(t.x * 100).toFixed(1)}% y=${(t.y * 100).toFixed(1)}%<br>` +
+        `BOYUT  : ${(t.w * 100).toFixed(1)}% x ${(t.h * 100).toFixed(1)}%`;
+    } else {
+      targetBox.className = '';
+      targetBox.textContent = 'HEDEF ALGILANMADI';
+    }
+
+    // Mod senkronu (sunucudan gelirse)
+    if (data.mode && data.mode !== mode) {
+      mode = data.mode;
+      updateModeUI();
+    }
+  }
+
+  // ── Mod Değiştir ──
+  function toggleMode() {
+    mode = mode === 'manual' ? 'track' : 'manual';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: 'set_mode', mode }));
+    }
+    updateModeUI();
+  }
+
+  function updateModeUI() {
+    const btn   = document.getElementById('mode-btn');
+    const label = document.getElementById('mode-label');
+    const manCard = document.getElementById('manual-card');
+
+    if (mode === 'track') {
+      btn.textContent = 'TAKİP MODU';
+      btn.className = 'track';
+      label.textContent = 'YOLO26 aktif — motor otomatik';
+      document.body.classList.add('tracking');
+      manCard.style.opacity = '0.3';
+      manCard.style.pointerEvents = 'none';
+    } else {
+      btn.textContent = 'MANUEL';
+      btn.className = 'manual';
+      label.textContent = 'Motor kontrol: KAPALI';
+      document.body.classList.remove('tracking');
+      manCard.style.opacity = '1';
+      manCard.style.pointerEvents = 'auto';
+    }
+  }
+
+  // ── Manuel Komut ──
+  function sendCmd(cmd) {
+    if (mode !== 'manual') return;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: 'manual_command', cmd }));
+    }
+  }
+
+  // Klavye desteği (← →)
+  document.addEventListener('keydown', (e) => {
+    if (mode !== 'manual') return;
+    if (e.key === 'ArrowLeft')  sendCmd('L');
+    if (e.key === 'ArrowRight') sendCmd('R');
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') sendCmd('S');
+  });
+
+  // Saat
+  setInterval(() => {
+    const t = new Date();
+    document.getElementById('time-val').textContent =
+      t.toTimeString().slice(0, 8);
+  }, 1000);
+
+  // Başlat
+  connect();
+</script>
+</body>
+</html>
