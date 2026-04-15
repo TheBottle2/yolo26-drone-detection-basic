@@ -12,6 +12,11 @@ import cv2
 import websockets
 from ultralytics import YOLO
 from config import *
+import sys
+
+PKG_PATH = "/media/luna/HardDisk/Python_Packages/"
+if PKG_PATH not in sys.path:
+    sys.path.insert(0, PKG_PATH)
 
 # ── Global durum ──────────────────────────────────────────────
 state = {
